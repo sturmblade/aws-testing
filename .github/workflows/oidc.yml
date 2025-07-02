@@ -1,0 +1,38 @@
+name: Test OIDC Authentication
+on:
+  workflow_dispatch:  # Manual trigger only
+
+jobs:
+  test-oidc:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: OIDC-Test-${{ github.run_id }}
+          
+      - name: Verify OIDC Authentication
+        run: |
+          echo "🔍 Checking AWS identity..."
+          CALLER_IDENTITY=$(aws sts get-caller-identity)
+          echo "$CALLER_IDENTITY"
+          
+          # Check if we're using assumed role
+          if echo "$CALLER_IDENTITY" | grep -q "assumed-role/GitHubActions-CodeBuild-Role"; then
+            echo "✅ SUCCESS: Using OIDC authentication with assumed role"
+          else
+            echo "❌ WARNING: Not using expected OIDC role"
+          fi
+          
+      - name: Test CodeBuild Access
+        run: |
+          echo "🧪 Testing CodeBuild access..."
+          aws codebuild list-projects
+          echo "✅ CodeBuild access confirmed via OIDC"
+
